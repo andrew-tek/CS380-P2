@@ -1,7 +1,11 @@
+//Andrew Tek
+//CS 380 Project 2
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -10,50 +14,43 @@ public class PhysLayerClient {
 
 	public static void main(String[] args) throws UnknownHostException, IOException {
 		 try (Socket socket = new Socket("codebank.xyz", 38002)) {
+			 	System.out.println("Connected to server...");
 			 	int value;
 			 	InputStream is = socket.getInputStream();
 			 	String message = "";
-			 	 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-	            InputStreamReader isr = new InputStreamReader(is, "UTF-8");
-	        	BufferedReader br = new BufferedReader(isr);
-			 	System.out.println("Bytes Received:");
+			 	OutputStream out = socket.getOutputStream();
 			 	int total = 0;
 			 	double baseline;
 			 	byte messageBits[] ;
-	            for (int i = 0; i < 64; i++) { 
-		            total += isr.read();
+	            for (int i = 0; i < 64; i++) {   //get running total of the preamble of values
+		            total += is.read();
 	            }
 	            baseline = (double)total / 64;
-	            System.out.println(baseline);
-	            System.out.println("HERE:");
+	            System.out.println("Established Baseline: " + baseline);
 	            for (int i = 0;i < 320; i++) {
-	            	value = isr.read();
-	            	//System.out.println(value1 + ",     " + i + "     " + message);
-	            	if (value > baseline) 
+	            	value = is.read();
+	            	if (value > baseline)  //compare incoming values with baseline
 	            		message = message.concat("1");
 	            	else 
 	            		message = message.concat("0");
 	            	
 	            }
 	            
-	            System.out.println("MESSAGE:" + message);
-	            message = decode(message);
-	            System.out.println(message.length());
-	            System.out.println("NEW MESSAGE: " + message);
-	            message = fiveToFour(message);
-	            System.out.println("4 bit Message: " + message);
-	            System.out.println("Size: " + message.length());
+	            message = decode(message); //decode NRZI.. check previous bit
+	            message = fiveToFour(message); //Use look up table to convert 5 bits to 4
 	            byte [] byteMessage = new byte [32];
-	            for (int i = 0; i < message.length(); i += 8) {
+	            System.out.print("Bytes Received:");
+	            for (int i = 0; i < message.length(); i += 8) { //store valus into byte array
 	            	byte tmp =  (byte)Integer.parseUnsignedInt(message.substring(i, i + 8), 2);
 	            	byteMessage [i / 8] = tmp;
-	            	out.write(tmp);
-	            	//byteMessage [i / 8] = Byte.parseByte(message.substring(i, i + 8), 2);
-	            	System.out.println(byteMessage[i / 8]);
+	            	System.out.print(tmp);
 	            }
-	            System.out.println("trying...");
-	            value = is.read();
-	            System.out.println("HERE IS THE RESULT: " + value);
+	            out.write(byteMessage); //write to server
+	            if (is.read() == 1)  //read response from sever
+	            	System.out.println("\nResponse Good!");
+	            else
+	            	System.out.println("\nIncorrect.");
+	            System.out.println("Disconnecting...");
 		 }
 
 	}
@@ -61,7 +58,6 @@ public class PhysLayerClient {
 		String ret = "";
 		char [] ch = s.toCharArray();
 		ret = ret + ch[0];
-		System.out.println("LENGTH: " + ch.length);
 		for (int i = 1; i < ch.length; i++) {
 			if (ch[i] == ch[i - 1]) 
 				ret = ret.concat("0");
